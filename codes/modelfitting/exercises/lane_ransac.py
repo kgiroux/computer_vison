@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 from operator import itemgetter
 plt.ion()
 
+def get_cmap(n, name='jet'):
+    '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct
+    RGB color; the keyword argument name must be a standard mpl colormap name.'''
+    return plt.cm.get_cmap(name, n)
 
 # datax0, datay0 are the dataset x, y
 # The line is defined with two points (x1, y1) (x2, y2)
@@ -19,6 +23,7 @@ def displayLineModel(datax0, datay0, x1, y1, x2, y2, c):
 
 dataset = '../ressources/kitti/odometry/01/image_2/'
 frameIdx = 40
+
 while True:
     print("Frame #%d" % frameIdx)
     imgName = "%s/%06d.png" % (dataset, frameIdx)
@@ -40,8 +45,10 @@ while True:
     y0 = ey
     x0 = ex
 
+    x_original = x0
+    y_original = y0
     # Do the ransac,
-    Titer = 100
+    Titer = 200
     lines = np.zeros((0, 4))  # Fill that with the lines (x1, y1) (x2, y2) detected
     threshold = 5
     x_best_1, y_best_1, x_best_2, y_best_2 = 0,0,0,0
@@ -74,34 +81,38 @@ while True:
             x_best_2 = x0[idx[1]]
             y_best_1 = y0[idx[0]]
             y_best_2 = y0[idx[1]]
-            list_lines.append(([y_best_1, x_best_1, y_best_2, x_best_2], modelScore))
+            list_lines.append(([y_best_1, x_best_1, y_best_2, x_best_2], modelScore, x0, y0, best_inliers_Mask))
             best_model_score = modelScore
             m_estimator_sac_best = m_estimator_sac
             best_inliers_Mask = inliersMask
+            x0 = x0[~inliersMask]
+            y0 = y0[~inliersMask]
         #y1, x1, y2, x2 = 0, 0, 0, 0
         #displayLineModel(x0, y0, x0[idx[0]], y0[idx[0]], x0[idx[1]], y0[idx[1]], 'r')
         #plt.waitforbuttonpress(0.001)
-
-    sorted(list_lines, key=lambda t: t[1], reverse=True)
-    if len(list_lines) - 2 > 2:
-        list_lines = list_lines[:2]
+    #if len(list_lines) - 2 > 2:
+    list_lines = list_lines[-3:]
     lines = np.vstack([lines, [y_best_1, x_best_1, y_best_2, x_best_2]])
 
     # Display the lines
     plt.figure('Ransac 1')
     plt.clf()
     plt.imshow(imBGR[..., ::-1]//2)
-    plt.scatter(x0, y0, color='r', s=1)
+    plt.scatter(x_original, y_original, color='r', s=1)
     data = np.argwhere(m_estimator_sac_best != 0)
-    plt.scatter(x0[best_inliers_Mask], y0[best_inliers_Mask], c='b')
+    #plt.scatter(x_original[best_inliers_Mask], y_original[best_inliers_Mask], c='b')
+    index = 0
+    cmap = get_cmap(len(list_lines))
     for i in range(len(list_lines)):
+        plt.scatter(list_lines[i][2][list_lines[i][3]], list_lines[i][3][list_lines[i][3]], c=cmap(index))
         y1, x1, y2, x2 = list_lines[i][0]
         plt.plot([x1, x2], [y1, y2], 'g', marker='o', linewidth=2)
+        index +=1
     plt.xlim(0, imBGR.shape[1])
     plt.ylim(imBGR.shape[0], 0)
 
     # Use either of the following functions:
-    plt.waitforbuttonpress(0.01)  # Wait for a button (click, key) to be pressed
+    plt.waitforbuttonpress(0.001)  # Wait for a button (click, key) to be pressed
     # frameIdx += 10
-    frameIdx += 5
+    frameIdx += 10
     # plt.waitforbuttonpress()  # Pause for 0.02 second. Useful to get an animation
